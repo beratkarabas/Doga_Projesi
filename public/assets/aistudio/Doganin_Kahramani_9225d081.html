@@ -1,0 +1,1083 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Doğa Kahramanları - Çevre Eğitimi Oyunu</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+    }
+    body {
+      font-family: 'Comic Sans MS', 'Chalkboard SE', 'Comic Neue', sans-serif;
+      background: #c8e6c9;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      overflow: hidden;
+    }
+    #game-container {
+      width: 1000px;
+      height: 600px;
+      position: relative;
+      background-size: cover;
+      background-position: center;
+      border: 6px solid #2e7d32;
+      border-radius: 20px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+      overflow: hidden;
+      background-color: #aed581;
+    }
+    /* Puki Rehber & Konuşma Balonu */
+    #puki-guide {
+      position: absolute;
+      top: 12px;
+      left: 15px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      z-index: 120;
+      pointer-events: none;
+      max-width: 650px;
+    }
+    #puki-img {
+      width: 85px;
+      height: 85px;
+      object-fit: contain;
+      filter: drop-shadow(0 4px 6px rgba(0,0,0,0.2));
+      animation: float 2.5s infinite ease-in-out;
+    }
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-6px); }
+    }
+    #speech-bubble {
+      background: #ffffff;
+      border: 4px solid #00bcd4;
+      border-radius: 18px;
+      padding: 10px 16px;
+      font-size: 15px;
+      color: #37474f;
+      font-weight: bold;
+      position: relative;
+      box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+      line-height: 1.35;
+      max-width: 520px;
+    }
+    #speech-bubble::before {
+      content: '';
+      position: absolute;
+      left: -14px;
+      top: 25px;
+      border-width: 8px 14px 8px 0;
+      border-style: solid;
+      border-color: transparent #00bcd4 transparent transparent;
+    }
+
+    /* Oyun Nesneleri */
+    .game-object {
+      position: absolute;
+      cursor: pointer;
+      transition: transform 0.2s, filter 0.2s, opacity 0.2s;
+      z-index: 25;
+    }
+    .game-object:hover {
+      transform: scale(1.1);
+      filter: drop-shadow(0 0 10px #ffeb3b);
+    }
+    .game-object:active {
+      transform: scale(0.95);
+    }
+    .placed-bin {
+      position: absolute;
+      cursor: pointer;
+      z-index: 20;
+      transition: transform 0.2s, filter 0.2s;
+    }
+    .placed-bin:hover {
+      transform: scale(1.08);
+      filter: drop-shadow(0 0 12px #00e676);
+    }
+    .trash-selected {
+      filter: drop-shadow(0 0 14px #e91e63) brightness(1.1) !important;
+      transform: scale(1.22) translateY(-8px) !important;
+      animation: bounce 0.8s infinite alternate !important;
+      z-index: 40 !important;
+    }
+    @keyframes bounce {
+      from { transform: scale(1.22) translateY(-6px); }
+      to { transform: scale(1.22) translateY(-14px); }
+    }
+    .shake {
+      animation: shake 0.4s ease-in-out !important;
+    }
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      20%, 60% { transform: translateX(-10px); }
+      40%, 80% { transform: translateX(10px); }
+    }
+
+    /* 2. Seviye için Ekranın Ortasındaki Fidan Koyma Kutucuğu */
+    #center-plant-box {
+      position: absolute;
+      left: 430px;
+      top: 420px;
+      width: 140px;
+      height: 140px;
+      border: 4px dashed #ff9800;
+      border-radius: 20px;
+      background: rgba(255, 255, 255, 0.85);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      z-index: 45;
+      box-shadow: 0 6px 15px rgba(0,0,0,0.25);
+      animation: targetPulse 1.2s infinite alternate;
+    }
+    #center-plant-box:hover {
+      transform: scale(1.05);
+      background: rgba(255, 235, 59, 0.4);
+    }
+    @keyframes targetPulse {
+      0% { transform: scale(1); border-color: #ff9800; }
+      100% { transform: scale(1.04); border-color: #ff5722; }
+    }
+
+    /* Envanter / Sağ Alt Köşe */
+    #inventory {
+      position: absolute;
+      right: 15px;
+      bottom: 15px;
+      background: rgba(255, 255, 255, 0.94);
+      border: 4px dashed #4caf50;
+      border-radius: 18px;
+      padding: 8px 12px;
+      display: flex;
+      gap: 12px;
+      z-index: 80;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+      align-items: center;
+    }
+    .inventory-item {
+      width: 75px;
+      height: 75px;
+      object-fit: contain;
+      cursor: pointer;
+      border: 3px solid transparent;
+      border-radius: 12px;
+      padding: 4px;
+      transition: all 0.2s;
+    }
+    .inventory-item:hover {
+      transform: scale(1.1);
+      border-color: #ff9800;
+      background: rgba(255,235,59,0.2);
+    }
+    .selected-tool {
+      border: 3px solid #e91e63 !important;
+      background: rgba(233, 30, 99, 0.2) !important;
+      transform: scale(1.12);
+      animation: pulse 1.2s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { transform: scale(1.12); }
+      50% { transform: scale(1.2); }
+    }
+
+    /* İlerleme Çubuğu (Seviye 4) */
+    #air-bar-container {
+      position: absolute;
+      right: 20px;
+      bottom: 115px;
+      width: 180px;
+      background: #fff;
+      border: 3px solid #607d8b;
+      border-radius: 15px;
+      padding: 6px;
+      z-index: 80;
+      display: none;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+      text-align: center;
+    }
+    #air-bar-label {
+      font-size: 13px;
+      font-weight: bold;
+      color: #37474f;
+      margin-bottom: 4px;
+    }
+    #air-bar-bg {
+      width: 100%;
+      height: 18px;
+      background: #cfd8dc;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    #air-bar-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #4caf50, #8bc34a);
+      transition: width 0.4s ease;
+    }
+
+    /* Modallar ve Menüler */
+    #reward-modal, #level-modal {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0, 0, 0, 0.75);
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 250;
+      animation: fadeIn 0.3s ease;
+    }
+    #reward-card, #level-card {
+      background: #ffffff;
+      border-radius: 25px;
+      padding: 30px;
+      text-align: center;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+      max-width: 480px;
+      animation: popZoom 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+    #reward-card { border: 6px solid #ffd700; }
+    #level-card { border: 6px solid #4caf50; }
+    #reward-img {
+      width: 150px;
+      height: 150px;
+      object-fit: contain;
+      margin: 10px 0;
+    }
+    .btn {
+      display: block;
+      width: 100%;
+      margin-top: 12px;
+      padding: 12px 20px;
+      font-size: 16px;
+      font-weight: bold;
+      background: #ff9800;
+      color: white;
+      border: none;
+      border-radius: 20px;
+      cursor: pointer;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+      transition: all 0.2s;
+    }
+    .btn:hover { background: #f57c00; transform: translateY(-2px); }
+    .btn-green { background: #4caf50; }
+    .btn-green:hover { background: #388e3c; }
+    .btn-blue { background: #03a9f4; }
+    .btn-blue:hover { background: #0288d1; }
+
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes popZoom { 0% { transform: scale(0.65); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+  </style>
+</head>
+<body>
+
+  <div id="game-container">
+    <div id="puki-guide">
+      <img id="puki-img" src="puki_baykus.png" onerror="this.src='puki_baykus.jpg';" alt="Puki">
+      <div id="speech-bubble">Merhaba Doğa Kahramanı! Parkımızı temizlemek için hazır mısın?</div>
+    </div>
+
+    <div id="air-bar-container">
+      <div id="air-bar-label">Hava Temizliği: %<span id="air-val">0</span></div>
+      <div id="air-bar-bg">
+        <div id="air-bar-fill"></div>
+      </div>
+    </div>
+
+    <div id="play-area">
+      <!-- 2. Seviye Orta Fidan Dikme Kutucuğu -->
+      <div id="center-plant-box" onclick="placeSaplingInCenterBox()" title="Fidanı Buraya Koy!">
+        <span style="font-size: 13px; font-weight: bold; color: #e65100; text-align: center;">Fidanı<br>Buraya Koy</span>
+      </div>
+    </div>
+    
+    <div id="inventory"></div>
+
+    <!-- Ödül Pop-up'ı -->
+    <div id="reward-modal">
+      <div id="reward-card">
+        <div style="font-size: 26px; color: #e65100; font-weight: bold;">TEBRİKLER!</div>
+        <img id="reward-img" src="" alt="Ödül">
+        <div id="reward-desc" style="font-size: 16px; color: #455a64; margin: 10px 0;">Ödül Açıklaması</div>
+        <button class="btn btn-green" onclick="closeReward()">Harika, Devam Et!</button>
+      </div>
+    </div>
+
+    <!-- 3 Seçenekli Gelişmiş Seviye Geçiş Menüsü -->
+    <div id="level-modal">
+      <div id="level-card">
+        <h2 id="lvl-modal-title" style="font-size: 26px; color: #2e7d32; margin-bottom: 8px;">Bölüm Tamamlandı!</h2>
+        <p id="lvl-modal-msg" style="font-size: 16px; color: #546e7a; margin-bottom: 15px;"></p>
+        <div style="font-weight: bold; font-size: 17px; color: #e65100; margin-bottom: 10px;">Ne yapmak istersin?</div>
+        
+        <button class="btn btn-green" onclick="handleMenuChoice('next')">1. Seçenek: Sıradaki Seviyeye Geç</button>
+        <button class="btn btn-blue" onclick="handleMenuChoice('replay')">2. Seçenek: Aynı Bölümü Tekrar Oyna</button>
+        <button class="btn" style="background: #9c27b0;" onclick="handleMenuChoice('prev')">3. Seçenek: Önceki Bölümü Tekrar Oyna</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    let audioCtx = null;
+
+    function initAudio() {
+      if (!audioCtx) audioCtx = new AudioContext();
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+    }
+
+    function playTone(freq, type, duration, delay = 0) {
+      setTimeout(() => {
+        try {
+          initAudio();
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = type;
+          osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+          gain.gain.setValueAtTime(0.18, audioCtx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.start();
+          osc.stop(audioCtx.currentTime + duration);
+        } catch (e) {}
+      }, delay);
+    }
+
+    function playPop() { playTone(540, 'sine', 0.1); }
+    function playSizzle() { playTone(210, 'sawtooth', 0.28); }
+    function playWrongSound() { playTone(180, 'sawtooth', 0.2, 0); playTone(130, 'sawtooth', 0.35, 150); }
+    function playRewardFanfare() { playTone(440, 'triangle', 0.18, 0); playTone(554, 'triangle', 0.18, 120); playTone(659, 'triangle', 0.22, 240); playTone(880, 'triangle', 0.4, 380); }
+    function playLevelComplete() { playTone(523, 'sine', 0.16, 0); playTone(659, 'sine', 0.16, 160); playTone(784, 'sine', 0.16, 320); playTone(1046, 'sine', 0.5, 480); }
+
+    let currentLevel = 1;
+    let selectedTool = null;
+    let lvl1PlacedBins = { blue: false, green: false };
+    let selectedTrash = null;
+    let lvl1BlueCount = 0;
+    let lvl1GreenCount = 0;
+    let rewardSignCollected = false;
+    let rewardFlowerCollected = false;
+
+    let lvl2GlassCount = 0;
+    let lvl2CoalsCount = 0;
+    let saplingInInventory = false;
+    let saplingPlacedInCenter = false;
+
+    let lvl3TrashCount = 0;
+    let lvl4FilterCount = 0;
+    let lvl4PanelCount = 0;
+
+    const container = document.getElementById('game-container');
+    const playArea = document.getElementById('play-area');
+    const inventory = document.getElementById('inventory');
+    const bubble = document.getElementById('speech-bubble');
+    const rewardModal = document.getElementById('reward-modal');
+    const rewardImg = document.getElementById('reward-img');
+    const rewardDesc = document.getElementById('reward-desc');
+    const levelModal = document.getElementById('level-modal');
+    const airBarContainer = document.getElementById('air-bar-container');
+    const airBarFill = document.getElementById('air-bar-fill');
+    const airVal = document.getElementById('air-val');
+    const centerPlantBox = document.getElementById('center-plant-box');
+
+    function setBubble(text) { bubble.innerText = text; }
+    function setBg(baseName) { container.style.backgroundImage = `url('${baseName}.jpg'), url('${baseName}.png')`; }
+
+    let pendingRewardCallback = null;
+    function triggerReward(imgSrc, desc, callback) {
+      playRewardFanfare();
+      rewardImg.src = imgSrc;
+      rewardImg.onerror = function() { this.src = 'puki_baykus.png'; };
+      rewardDesc.innerText = desc;
+      pendingRewardCallback = callback;
+      rewardModal.style.display = 'flex';
+    }
+
+    function closeReward() {
+      rewardModal.style.display = 'none';
+      if (pendingRewardCallback) {
+        const cb = pendingRewardCallback;
+        pendingRewardCallback = null;
+        cb();
+      }
+    }
+
+    function showLevelMenu(title, msg) {
+      playLevelComplete();
+      document.getElementById('lvl-modal-title').innerText = title;
+      document.getElementById('lvl-modal-msg').innerText = msg;
+      levelModal.style.display = 'flex';
+    }
+
+    function handleMenuChoice(choice) {
+      levelModal.style.display = 'none';
+      if (choice === 'next') {
+        if (currentLevel === 1) startLevel2();
+        else if (currentLevel === 2) startLevel3();
+        else if (currentLevel === 3) startLevel4();
+        else if (currentLevel === 4) startLevel1();
+      } else if (choice === 'replay') {
+        if (currentLevel === 1) startLevel1();
+        else if (currentLevel === 2) startLevel2();
+        else if (currentLevel === 3) startLevel3();
+        else if (currentLevel === 4) startLevel4();
+      } else if (choice === 'prev') {
+        if (currentLevel === 1) startLevel1();
+        else if (currentLevel === 2) startLevel1();
+        else if (currentLevel === 3) startLevel2();
+        else if (currentLevel === 4) startLevel3();
+      }
+    }
+
+    // ==========================================
+    // --- SEVİYE 1: PARK ---
+    // ==========================================
+    function startLevel1() {
+      currentLevel = 1;
+      setBg('park_arka_plan');
+      airBarContainer.style.display = 'none';
+      centerPlantBox.style.display = 'none';
+      playArea.innerHTML = '';
+      playArea.appendChild(centerPlantBox);
+      inventory.innerHTML = '';
+      lvl1PlacedBins = { blue: false, green: false };
+      selectedTrash = null;
+      lvl1BlueCount = 0;
+      lvl1GreenCount = 0;
+      rewardSignCollected = false;
+      rewardFlowerCollected = false;
+
+      setBubble('Seviye 1: Parkı Kurtar! Önce sağ alttaki Mavi ve Yeşil kutulara tıklayarak parka yerleştir.');
+
+      inventory.innerHTML = `
+        <img id="inv-blue-bin" class="inventory-item" src="mavi_kutu.png" onerror="this.src='mavi_kutu.jpg'" title="Mavi Kutu" onclick="placeBin('blue')">
+        <img id="inv-green-bin" class="inventory-item" src="yesil_kutu.png" onerror="this.src='yesil_kutu.jpg'" title="Yeşil Kutu" onclick="placeBin('green')">
+      `;
+
+      const trashes = [
+        { id: 't-b1', name: 'cop_plastik', label: 'Plastik Şişe', target: 'blue', x: '290px', y: '400px', w: '65px' },
+        { id: 't-b2', name: 'cop_plastik', label: 'Plastik Şişe', target: 'blue', x: '490px', y: '360px', w: '60px' },
+        { id: 't-p1', name: 'cop_gazete',  label: 'Gazete',       target: 'blue', x: '380px', y: '450px', w: '72px' },
+        { id: 't-p2', name: 'cop_gazete',  label: 'Gazete',       target: 'blue', x: '580px', y: '390px', w: '75px' },
+        { id: 't-m1', name: 'cop_muz',     label: 'Muz Kabuğu',   target: 'green', x: '460px', y: '440px', w: '62px' },
+        { id: 't-m2', name: 'cop_muz',     label: 'Muz Kabuğu',   target: 'green', x: '530px', y: '470px', w: '65px' },
+        { id: 't-m3', name: 'cop_muz',     label: 'Muz Kabuğu',   target: 'green', x: '350px', y: '500px', w: '60px' }
+      ];
+
+      trashes.forEach(t => {
+        const img = document.createElement('img');
+        img.id = t.id;
+        img.src = `${t.name}.png`;
+        img.onerror = function() { this.src = `${t.name}.jpg`; };
+        img.className = 'game-object trash-item';
+        img.style.cssText = `left: ${t.x}; top: ${t.y}; width: ${t.w}; pointer-events: none; opacity: 0.75;`;
+        img.onclick = () => selectTrashItem(t);
+        playArea.appendChild(img);
+      });
+    }
+
+    function placeBin(color) {
+      initAudio();
+      playPop();
+      if (color === 'blue' && !lvl1PlacedBins.blue) {
+        lvl1PlacedBins.blue = true;
+        document.getElementById('inv-blue-bin').style.display = 'none';
+        const bin = document.createElement('img');
+        bin.id = 'placed-blue-bin';
+        bin.src = 'mavi_kutu.png';
+        bin.onerror = function() { this.src = 'mavi_kutu.jpg'; };
+        bin.className = 'placed-bin';
+        bin.style.cssText = 'left: 120px; bottom: 70px; width: 120px; height: 120px;';
+        bin.onclick = () => onBinTargetClicked('blue');
+        playArea.appendChild(bin);
+      }
+      if (color === 'green' && !lvl1PlacedBins.green) {
+        lvl1PlacedBins.green = true;
+        document.getElementById('inv-green-bin').style.display = 'none';
+        const bin = document.createElement('img');
+        bin.id = 'placed-green-bin';
+        bin.src = 'yesil_kutu.png';
+        bin.onerror = function() { this.src = 'yesil_kutu.jpg'; };
+        bin.className = 'placed-bin';
+        bin.style.cssText = 'right: 180px; bottom: 70px; width: 120px; height: 120px;';
+        bin.onclick = () => onBinTargetClicked('green');
+        playArea.appendChild(bin);
+      }
+
+      if (lvl1PlacedBins.blue && lvl1PlacedBins.green) {
+        playRewardFanfare();
+        inventory.innerHTML = '';
+        setBubble('Kutular yerleşti! Şimdi yerdeki çöpe tıkla, ardından uygun kutuya tıklayarak at.');
+        document.querySelectorAll('.trash-item').forEach(el => {
+          el.style.pointerEvents = 'auto';
+          el.style.opacity = '1';
+        });
+      }
+    }
+
+    function selectTrashItem(t) {
+      initAudio();
+      playPop();
+      document.querySelectorAll('.trash-item').forEach(el => el.classList.remove('trash-selected'));
+      selectedTrash = t;
+      const el = document.getElementById(t.id);
+      if (el) el.classList.add('trash-selected');
+      setBubble(`"${t.label}" seçildi. Şimdi Mavi veya Yeşil kutuya tıkla!`);
+    }
+
+    function onBinTargetClicked(binColor) {
+      initAudio();
+      if (!selectedTrash) {
+        setBubble('Önce yerdeki çöplerden birine tıklayıp seçmelisin!');
+        return;
+      }
+      const trashEl = document.getElementById(selectedTrash.id);
+
+      if (selectedTrash.target === binColor) {
+        playPop();
+        if (trashEl) trashEl.remove();
+        const correctTrash = selectedTrash;
+        selectedTrash = null;
+
+        if (correctTrash.target === 'blue') {
+          lvl1BlueCount++;
+          setBubble(`Doğru! ${correctTrash.label} Mavi kutuya atıldı.`);
+          if (lvl1BlueCount === 4 && !rewardSignCollected) {
+            rewardSignCollected = true;
+            const sign = document.createElement('img');
+            sign.id = 'right-bottom-sign';
+            sign.src = 'odul_tabela.png';
+            sign.onerror = function() { this.src = 'odul_tabela.jpg'; };
+            sign.className = 'game-object';
+            sign.style.cssText = 'right: 320px; bottom: 35px; width: 85px; z-index: 50;';
+            sign.title = 'Tabela Ödülü - Tıkla!';
+            sign.onclick = () => {
+              triggerReward('odul_tabela.png', 'Tebrikler! Mavi kutuyu doldurdun ve Çevre Koruma Tabelası kazandın!', () => {
+                sign.remove();
+                checkLevel1Complete();
+              });
+            };
+            playArea.appendChild(sign);
+            setBubble('Harika! Sağ altta Tabela ödülü belirdi, almak için üzerine tıkla!');
+            return;
+          }
+        } else {
+          lvl1GreenCount++;
+          setBubble(`Aferin! ${correctTrash.label} Yeşil kutuya atıldı.`);
+          if (lvl1GreenCount === 3 && !rewardFlowerCollected) {
+            rewardFlowerCollected = true;
+            const flower = document.createElement('img');
+            flower.id = 'right-bottom-flower';
+            flower.src = 'odul_cicek.png';
+            flower.onerror = function() { this.src = 'odul_cicek.jpg'; };
+            flower.className = 'game-object';
+            flower.style.cssText = 'right: 420px; bottom: 35px; width: 90px; z-index: 50;';
+            flower.title = 'Çiçek Ödülü - Tıkla!';
+            flower.onclick = () => {
+              triggerReward('odul_cicek.png', 'Tebrikler! Yeşil kutuyu doldurdun ve Rengarenk Çiçekler kazandın!', () => {
+                flower.remove();
+                checkLevel1Complete();
+              });
+            };
+            playArea.appendChild(flower);
+            setBubble('Süper! Sağ altta Çiçek ödülü belirdi, almak için üzerine tıkla!');
+            return;
+          }
+        }
+        checkLevel1Complete();
+      } else {
+        playWrongSound();
+        if (trashEl) {
+          trashEl.classList.add('shake');
+          setTimeout(() => trashEl.classList.remove('shake'), 400);
+        }
+        setBubble('Yanlış kutu! Tekrar dene.');
+      }
+    }
+
+    function checkLevel1Complete() {
+      if (lvl1BlueCount >= 4 && lvl1GreenCount >= 3 && rewardSignCollected && rewardFlowerCollected && !document.getElementById('right-bottom-sign') && !document.getElementById('right-bottom-flower')) {
+        setTimeout(() => {
+          showLevelMenu('1. Seviye Tamamlandı!', 'Parkı tertemiz yaptın ve tüm ödülleri topladın!');
+        }, 500);
+      }
+    }
+
+    // ==========================================
+    // --- SEVİYE 2: ORMAN ---
+    // ==========================================
+    function startLevel2() {
+      currentLevel = 2;
+      setBg('orman_kurak_arka_plan');
+      playArea.innerHTML = '';
+      playArea.appendChild(centerPlantBox);
+      centerPlantBox.style.display = 'none';
+      inventory.innerHTML = '';
+      selectedTool = null;
+      lvl2GlassCount = 0;
+      lvl2CoalsCount = 0;
+      saplingInInventory = false;
+      saplingPlacedInCenter = false;
+      setBubble('Seviye 2: Ormanı Kurtar! Önce yerdeki 3 cam kırığını topla.');
+
+      const glasses = [
+        { id: 'g1', x: '180px', y: '400px' },
+        { id: 'g2', x: '450px', y: '380px' },
+        { id: 'g3', x: '680px', y: '420px' }
+      ];
+      glasses.forEach(g => {
+        const img = document.createElement('img');
+        img.id = g.id;
+        img.src = 'cam_kirigi.png';
+        img.onerror = function() { this.src = 'cam_kirigi.jpg'; };
+        img.className = 'game-object';
+        img.style.cssText = `left: ${g.x}; top: ${g.y}; width: 95px; filter: drop-shadow(0 0 10px rgba(255,255,255,0.9));`;
+        img.onclick = () => collectGlass(g.id);
+        playArea.appendChild(img);
+      });
+
+      const coals = [
+        { id: 'c1', x: '330px', y: '460px' },
+        { id: 'c2', x: '560px', y: '450px' }
+      ];
+      coals.forEach(c => {
+        const img = document.createElement('img');
+        img.id = c.id;
+        img.src = 'yanan_koz.png';
+        img.onerror = function() { this.src = 'yanan_koz.jpg'; };
+        img.className = 'game-object';
+        img.style.cssText = `left: ${c.x}; top: ${c.y}; width: 90px;`;
+        img.onclick = () => extinguishCoal(c.id);
+        playArea.appendChild(img);
+      });
+
+      inventory.innerHTML = `
+        <img id="inv-bucket" class="inventory-item" src="yangin_kovasi.png" onerror="this.src='yangin_kovasi.jpg'" title="Yangın Kovası" onclick="selectBucket()">
+      `;
+    }
+
+    function collectGlass(id) {
+      initAudio();
+      playPop();
+      const el = document.getElementById(id);
+      if (el) el.remove();
+      lvl2GlassCount++;
+
+      if (lvl2GlassCount >= 3) {
+        playRewardFanfare();
+        setBubble('Camlar toplandı! Şimdi sağ alttaki su kovasını seçip közleri söndür.');
+      }
+    }
+
+    function selectBucket() {
+      initAudio();
+      playPop();
+      if (lvl2GlassCount < 3) {
+        setBubble('Önce yerdeki 3 cam kırığını toplamalısın!');
+        return;
+      }
+      selectedTool = 'bucket';
+      document.getElementById('inv-bucket').classList.add('selected-tool');
+      setBubble('Kova elinde! Şimdi yanan közlere tıkla.');
+    }
+
+    function extinguishCoal(id) {
+      initAudio();
+      if (selectedTool !== 'bucket') {
+        setBubble('Közü söndürmek için sağ alttaki su kovasını seçmelisin!');
+        return;
+      }
+      playSizzle();
+      const el = document.getElementById(id);
+      if (el) el.remove();
+      lvl2CoalsCount++;
+
+      if (lvl2CoalsCount >= 2) {
+        selectedTool = null;
+        inventory.innerHTML = '';
+        
+        // Sağ altta fidan ödülü belirsin
+        const saplingReward = document.createElement('img');
+        saplingReward.id = 'right-bottom-sapling';
+        saplingReward.src = 'kucuk_fidan.png';
+        saplingReward.onerror = function() { this.src = 'kucuk_fidan.jpg'; };
+        saplingReward.className = 'game-object';
+        saplingReward.style.cssText = 'right: 320px; bottom: 35px; width: 90px; z-index: 50;';
+        saplingReward.title = 'Fidan Ödülü - Tıkla!';
+        saplingReward.onclick = () => {
+          triggerReward('kucuk_fidan.png', 'Tebrikler! Yangını söndürdün ve Can Veren Fidan kazandın!', () => {
+            saplingReward.remove();
+            saplingInInventory = true;
+            inventory.innerHTML = `
+              <img id="inv-sapling" class="inventory-item" src="kucuk_fidan.png" onerror="this.src='kucuk_fidan.jpg'" title="Fidan" onclick="selectSaplingTool()">
+            `;
+            setBubble('Sağ alttaki fidana tıkla, ardından ekrandaki ortadaki kutucuğa tıklayarak fidanı ortaya koy!');
+          });
+        };
+        playArea.appendChild(saplingReward);
+        setBubble('Yangın söndürüldü! Sağ altta Fidan ödülü belirdi, almak için üzerine tıkla.');
+      }
+    }
+
+    function selectSaplingTool() {
+      initAudio();
+      playPop();
+      selectedTool = 'sapling';
+      document.getElementById('inv-sapling').classList.add('selected-tool');
+      centerPlantBox.style.display = 'flex'; // Ortadaki kutucuğu göster
+      setBubble('Fidan elinde! Şimdi ekrandaki ortada beliren kutucuğa tıklayarak yerleştir.');
+    }
+
+    function placeSaplingInCenterBox() {
+      if (selectedTool === 'sapling' && saplingInInventory && !saplingPlacedInCenter) {
+        initAudio();
+        playPop();
+        saplingInInventory = false;
+        saplingPlacedInCenter = true;
+        inventory.innerHTML = '';
+        selectedTool = null;
+        centerPlantBox.style.display = 'none';
+
+        const sapling = document.createElement('img');
+        sapling.id = 'planted-sapling';
+        sapling.src = 'kucuk_fidan.png';
+        sapling.onerror = function() { this.src = 'kucuk_fidan.jpg'; };
+        sapling.className = 'game-object';
+        sapling.style.cssText = 'left: 455px; bottom: 120px; width: 95px; pointer-events: none;';
+        playArea.appendChild(sapling);
+
+        const cloud = document.createElement('img');
+        cloud.id = 'rain-cloud';
+        cloud.src = 'yagmur_bulutu.png';
+        cloud.onerror = function() { this.src = 'yagmur_bulutu.jpg'; };
+        cloud.className = 'game-object';
+        cloud.style.cssText = 'left: 420px; top: 60px; width: 160px; cursor: pointer; filter: drop-shadow(0 0 12px #29b6f6);';
+        cloud.onclick = makeRain;
+        playArea.appendChild(cloud);
+
+        setBubble('Fidan ormana yerleştirildi! Şimdi gökyüzündeki yağmur bulutuna tıkla ve ormana can suyu ver.');
+      }
+    }
+
+    function makeRain() {
+      initAudio();
+      setBg('orman_yesil_arka_plan');
+      const sapling = document.getElementById('planted-sapling');
+      if (sapling) {
+        sapling.src = 'yeseren_agac.png';
+        sapling.onerror = function() { this.src = 'yeseren_agac.jpg'; };
+        sapling.style.width = '175px';
+        sapling.style.bottom = '110px';
+        sapling.style.left = '415px';
+      }
+      
+      const treeReward = document.createElement('img');
+      treeReward.id = 'right-bottom-tree';
+      treeReward.src = 'yeseren_agac.png';
+      treeReward.onerror = function() { this.src = 'yeseren_agac.jpg'; };
+      treeReward.className = 'game-object';
+      treeReward.style.cssText = 'right: 320px; bottom: 35px; width: 100px; z-index: 50;';
+      treeReward.title = 'Ödül - Tıkla!';
+      treeReward.onclick = () => {
+        triggerReward('yeseren_agac.png', 'Tebrikler! Ormanı canlandırdın ve Ulu Ağaç Ödülü kazandın!', () => {
+          treeReward.remove();
+          showLevelMenu('2. Seviye Tamamlandı!', 'Ormanı yangından kurtardın ve doğayı yeşerttin!');
+        });
+      };
+      playArea.appendChild(treeReward);
+      setBubble('Orman canlandı! Sağ alttaki ödülü almak için üzerine tıkla.');
+    }
+
+    // ==========================================
+    // --- SEVİYE 3: GÖL ---
+    // ==========================================
+    function startLevel3() {
+      currentLevel = 3;
+      setBg('gol_bulanik_arka_plan');
+      centerPlantBox.style.display = 'none';
+      playArea.innerHTML = '';
+      playArea.appendChild(centerPlantBox);
+      inventory.innerHTML = '';
+      selectedTool = null;
+      lvl3TrashCount = 0;
+      setBubble('Seviye 3: Göldeki Dostumuz! Sudaki poşet ve bardakları toplayarak suyu temizle.');
+
+      const turtle = document.createElement('img');
+      turtle.id = 'turtle';
+      turtle.src = 'uzgun_kaplumbaga.png';
+      turtle.onerror = function() { this.src = 'uzgun_kaplumbaga.jpg'; };
+      turtle.className = 'game-object';
+      turtle.style.cssText = 'left: 450px; bottom: 100px; width: 155px; z-index: 25;';
+      turtle.onclick = rescueTurtle;
+      playArea.appendChild(turtle);
+
+      const pondItems = [
+        { id: 'p-b1', name: 'atik_poset',  x: '240px', y: '290px', w: '85px' },
+        { id: 'p-c1', name: 'atik_bardak', x: '350px', y: '330px', w: '70px' },
+        { id: 'p-b2', name: 'atik_poset',  x: '640px', y: '270px', w: '85px' },
+        { id: 'p-c2', name: 'atik_bardak', x: '720px', y: '340px', w: '70px' },
+        { id: 'p-c3', name: 'atik_bardak', x: '290px', y: '400px', w: '75px' },
+        { id: 'p-b3', name: 'atik_poset',  x: '620px', y: '390px', w: '80px' }
+      ];
+
+      pondItems.forEach(p => {
+        const img = document.createElement('img');
+        img.id = p.id;
+        img.src = `${p.name}.png`;
+        img.onerror = function() { this.src = `${p.name}.jpg`; };
+        img.className = 'game-object';
+        img.style.cssText = `left: ${p.x}; top: ${p.y}; width: ${p.w};`;
+        img.onclick = () => collectPondTrash(p.id);
+        playArea.appendChild(img);
+      });
+    }
+
+    function collectPondTrash(id) {
+      initAudio();
+      playPop();
+      const el = document.getElementById(id);
+      if (el) el.remove();
+      lvl3TrashCount++;
+
+      if (lvl3TrashCount >= 6) {
+        setBg('gol_mavi_arka_plan');
+        const scissorReward = document.createElement('img');
+        scissorReward.id = 'right-bottom-scissor';
+        scissorReward.src = 'kurtarma_makas.png';
+        scissorReward.onerror = function() { this.src = 'kurtarma_makas.jpg'; };
+        scissorReward.className = 'game-object';
+        scissorReward.style.cssText = 'right: 320px; bottom: 35px; width: 90px; z-index: 50;';
+        scissorReward.title = 'Makas Ödülü - Tıkla!';
+        scissorReward.onclick = () => {
+          triggerReward('kurtarma_makas.png', 'Tebrikler! Gölü temizledin ve Kurtarma Makası kazandın!', () => {
+            scissorReward.remove();
+            inventory.innerHTML = `
+              <img id="inv-scissors" class="inventory-item" src="kurtarma_makas.png" onerror="this.src='kurtarma_makas.jpg'" title="Kurtarma Makası" onclick="selectScissors()">
+            `;
+            setBubble('Sağ alttaki makasa tıkla, ardından ortadaki üzgün kaplumbağaya tıkla!');
+          });
+        };
+        playArea.appendChild(scissorReward);
+        setBubble('Göl masmavi oldu! Sağ altta Makas ödülü belirdi, almak için üzerine tıkla.');
+      }
+    }
+
+    function selectScissors() {
+      initAudio();
+      playPop();
+      selectedTool = 'scissors';
+      document.getElementById('inv-scissors').classList.add('selected-tool');
+      setBubble('Makas elinde! Kaplumbağaya tıkla.');
+    }
+
+    function rescueTurtle() {
+      initAudio();
+      if (selectedTool !== 'scissors') {
+        setBubble('Kaplumbağayı kurtarmak için önce sağ alttaki makasa tıklamalısın!');
+        return;
+      }
+      playRewardFanfare();
+      const turtle = document.getElementById('turtle');
+      turtle.src = 'mutlu_kaplumbaga.png';
+      turtle.onerror = function() { this.src = 'mutlu_kaplumbaga.jpg'; };
+      turtle.style.transform = 'scale(1.2)';
+      inventory.innerHTML = '';
+      
+      const turtleReward = document.createElement('img');
+      turtleReward.id = 'right-bottom-turtle';
+      turtleReward.src = 'mutlu_kaplumbaga.png';
+      turtleReward.onerror = function() { this.src = 'mutlu_kaplumbaga.jpg'; };
+      turtleReward.className = 'game-object';
+      turtleReward.style.cssText = 'right: 320px; bottom: 35px; width: 100px; z-index: 50;';
+      turtleReward.title = 'Ödül - Tıkla!';
+      turtleReward.onclick = () => {
+        triggerReward('mutlu_kaplumbaga.png', 'Tebrikler! Kaplumbağayı kurtardın ve özgürlüğüne kavuşturdun!', () => {
+          turtleReward.remove();
+          showLevelMenu('3. Seviye Tamamlandı!', 'Göl ekosistemini ve canlıları korudun!');
+        });
+      };
+      playArea.appendChild(turtleReward);
+      setBubble('Kaplumbağa kurtarıldı! Sağ alttaki ödülü almak için üzerine tıkla.');
+    }
+
+    // ==========================================
+    // --- SEVİYE 4: ŞEHİR ---
+    // ==========================================
+    function startLevel4() {
+      currentLevel = 4;
+      setBg('sehir_karanlik_arka_plan');
+      centerPlantBox.style.display = 'none';
+      playArea.innerHTML = '';
+      playArea.appendChild(centerPlantBox);
+      inventory.innerHTML = '';
+      selectedTool = null;
+      lvl4FilterCount = 0;
+      lvl4PanelCount = 0;
+      airBarContainer.style.display = 'block';
+      updateAirBar();
+
+      setBubble('Seviye 4: Temiz Enerjili Şehir! Filtre alıp bacalara, güneş paneli alıp güvenli çatı alanlarına yerleştir.');
+
+      const smokes = [
+        { id: 'smk1', x: '55px', y: '50px', w: '180px' },
+        { id: 'smk2', x: '350px', y: '120px', w: '160px' }
+      ];
+      smokes.forEach(s => {
+        const img = document.createElement('img');
+        img.id = s.id;
+        img.src = 'gri_duman.png';
+        img.onerror = function() { this.src = 'gri_duman.jpg'; };
+        img.className = 'game-object';
+        img.style.cssText = `left: ${s.x}; top: ${s.y}; width: ${s.w}; pointer-events: none; opacity: 0.85;`;
+        playArea.appendChild(img);
+      });
+
+      const chimneys = [
+        { id: 'chim1', x: '45px', y: '105px', w: '65px', h: '85px', fx: '45px', fy: '100px' },
+        { id: 'chim2', x: '105px', y: '105px', w: '65px', h: '85px', fx: '105px', fy: '100px' }
+      ];
+      chimneys.forEach(c => {
+        const zone = document.createElement('div');
+        zone.id = c.id;
+        zone.style.cssText = `position: absolute; left: ${c.x}; top: ${c.y}; width: ${c.w}; height: ${c.h}; cursor: pointer; z-index: 35; border: 3px dashed rgba(255,235,59,0.8); border-radius: 8px; background: rgba(255,235,59,0.2);`;
+        zone.onclick = () => placeFilterOnChimney(c);
+        playArea.appendChild(zone);
+      });
+
+      const roofs = [
+        { id: 'roof1', x: '380px', y: '335px', w: '110px', h: '50px', px: '380px', py: '330px', pw: '100px' },
+        { id: 'roof2', x: '250px', y: '420px', w: '105px', h: '50px', px: '250px', py: '415px', pw: '95px' },
+        { id: 'roof3', x: '460px', y: '445px', w: '110px', h: '50px', px: '460px', py: '440px', pw: '100px' }
+      ];
+      roofs.forEach(r => {
+        const zone = document.createElement('div');
+        zone.id = r.id;
+        zone.style.cssText = `position: absolute; left: ${r.x}; top: ${r.y}; width: ${r.w}; height: ${r.h}; cursor: pointer; z-index: 35; border: 3px dashed rgba(3,169,244,0.8); border-radius: 8px; background: rgba(3,169,244,0.2);`;
+        zone.onclick = () => placePanelOnRoof(r);
+        playArea.appendChild(zone);
+      });
+
+      inventory.innerHTML = `
+        <img id="inv-filter" class="inventory-item" src="baca_filtresi.png" onerror="this.src='baca_filtresi.jpg'" title="Baca Filtresi" onclick="selectCityTool('filter')">
+        <img id="inv-panel" class="inventory-item" src="gunes_paneli.png" onerror="this.src='gunes_paneli.jpg'" title="Güneş Paneli" onclick="selectCityTool('panel')">
+      `;
+    }
+
+    function selectCityTool(type) {
+      initAudio();
+      playPop();
+      selectedTool = type;
+      document.querySelectorAll('.inventory-item').forEach(el => el.classList.remove('selected-tool'));
+      if (type === 'filter') {
+        document.getElementById('inv-filter').classList.add('selected-tool');
+        setBubble('Baca Filtresi seçildi! Fabrika bacalarına tıkla.');
+      } else {
+        document.getElementById('inv-panel').classList.add('selected-tool');
+        setBubble('Güneş Paneli seçildi! İşaretli ev çatılarına tıkla.');
+      }
+    }
+
+    function placeFilterOnChimney(c) {
+      initAudio();
+      if (selectedTool !== 'filter') {
+        setBubble('Bacayı temizlemek için Baca Filtresini seçmelisin!');
+        return;
+      }
+      playPop();
+      const zone = document.getElementById(c.id);
+      if (zone) zone.remove();
+
+      const fImg = document.createElement('img');
+      fImg.src = 'baca_filtresi.png';
+      fImg.onerror = function() { this.src = 'baca_filtresi.jpg'; };
+      fImg.className = 'game-object';
+      fImg.style.cssText = `left: ${c.fx}; top: ${c.fy}; width: 65px; z-index: 40;`;
+      playArea.appendChild(fImg);
+
+      lvl4FilterCount++;
+      updateAirBar();
+
+      if (lvl4FilterCount >= 2) {
+        const s1 = document.getElementById('smk1');
+        if (s1) s1.remove();
+      }
+      checkCityComplete();
+    }
+
+    function placePanelOnRoof(r) {
+      initAudio();
+      if (selectedTool !== 'panel') {
+        setBubble('Elektrik üretmek için Güneş Panelini seçmelisin!');
+        return;
+      }
+      playPop();
+      const zone = document.getElementById(r.id);
+      if (zone) zone.remove();
+
+      const pImg = document.createElement('img');
+      pImg.src = 'gunes_paneli.png';
+      pImg.onerror = function() { this.src = 'gunes_paneli.jpg'; };
+      pImg.className = 'game-object';
+      pImg.style.cssText = `left: ${r.px}; top: ${r.py}; width: ${r.pw}; z-index: 40;`;
+      playArea.appendChild(pImg);
+
+      lvl4PanelCount++;
+      updateAirBar();
+
+      if (lvl4PanelCount >= 2) {
+        const s2 = document.getElementById('smk2');
+        if (s2) s2.remove();
+      }
+      checkCityComplete();
+    }
+
+    function updateAirBar() {
+      const totalSteps = 5;
+      const done = lvl4FilterCount + lvl4PanelCount;
+      const pct = Math.round((done / totalSteps) * 100);
+      airBarFill.style.width = pct + '%';
+      airVal.innerText = pct;
+    }
+
+    function checkCityComplete() {
+      if (lvl4FilterCount >= 2 && lvl4PanelCount >= 3) {
+        setBg('sehir_aydinlik_arka_plan');
+        inventory.innerHTML = '';
+        airBarContainer.style.display = 'none';
+
+        const bikeReward = document.createElement('img');
+        bikeReward.id = 'right-bottom-bike';
+        bikeReward.src = 'bisiklet_yolu_gunes.png';
+        bikeReward.onerror = function() { this.src = 'bisiklet_yolu_gunes.jpg'; };
+        bikeReward.className = 'game-object';
+        bikeReward.style.cssText = 'right: 320px; bottom: 35px; width: 110px; z-index: 50;';
+        bikeReward.title = 'Ödül - Tıkla!';
+        bikeReward.onclick = () => {
+          triggerReward('bisiklet_yolu_gunes.png', 'Tebrikler! Şehri temiz enerjiyle donattın ve Bisiklet Yolu Ödülü kazandın!', () => {
+            bikeReward.remove();
+            showLevelMenu('TÜM DÜNYAYI KURTARDIN!', '4 Seviyenin tamamını başarıyla bitirdin! Puki ve tüm doğa sana teşekkür ediyor.');
+            document.getElementById('lvl-modal-btn').innerText = 'Baştan Oyna';
+          });
+        };
+        playArea.appendChild(bikeReward);
+        setBubble('Şehir tertemiz oldu! Sağ alttaki ödülü almak için üzerine tıkla.');
+      }
+    }
+
+    window.onload = () => {
+      startLevel1();
+    };
+  </script>
+</body>
+</html>
